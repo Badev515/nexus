@@ -151,6 +151,7 @@ export default function Home() {
   const requestId = useRef(0);
   const trendRequestId = useRef(0);
   const isFirstRun = useRef(true);
+  const rangeDebounceRef = useRef(null);
 
   const playCountry = country.alpha2Code ? country.alpha2Code.toLowerCase() : 'us';
   const geo = country.alpha2Code ? country.alpha2Code.toUpperCase() : '';
@@ -216,9 +217,15 @@ export default function Home() {
     fetchTrend(word, geo, range);
   };
 
+  // Range button click par turant fetch nahi - 350ms debounce, taake user
+  // jab jaldi jaldi 24h/7d/1mo click kare to sirf AAKHRI wala ek hi Trends
+  // request bane, har click apna alag burst na banaye (IP block ki wajah).
   const handleRangeChange = (newRange) => {
     setRange(newRange);
-    if (activeWord) fetchTrend(activeWord, geo, newRange);
+    if (rangeDebounceRef.current) clearTimeout(rangeDebounceRef.current);
+    if (activeWord) {
+      rangeDebounceRef.current = setTimeout(() => fetchTrend(activeWord, geo, newRange), 350);
+    }
   };
 
   const handleAddToCompare = (word) => {

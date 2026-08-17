@@ -685,25 +685,33 @@ export default function RelatedQueries({ keyword, country, range, onSearchThis }
     const currentRequest = ++requestId.current;
     setLoading(true);
 
-    getRelatedQueries(keyword, country, range)
-      .then((res) => {
-        if (currentRequest !== requestId.current) return;
-        
-        // FIX (CRITICAL): Agar API object mein top/rising array return nahi hota toh app crash hojaati.
-        // Ye line ensure karegi ke top aur rising hamesha arrays rahein, aur app na phatay.
-        setData({ 
-          top: res?.top || [], 
-          rising: res?.rising || [], 
-          rateLimited: res?.rateLimited || false 
+    // Range/country jaldi jaldi badalne par har intermediate value ke liye
+    // alag Trends request na jaye - 350ms debounce, sirf aakhri value fetch
+    // hoti hai. Isse related+interest bursts kam hote hain jo IP block
+    // trigger karte the.
+    const timer = setTimeout(() => {
+      getRelatedQueries(keyword, country, range)
+        .then((res) => {
+          if (currentRequest !== requestId.current) return;
+
+          // FIX (CRITICAL): Agar API object mein top/rising array return nahi hota toh app crash hojaati.
+          // Ye line ensure karegi ke top aur rising hamesha arrays rahein, aur app na phatay.
+          setData({
+            top: res?.top || [],
+            rising: res?.rising || [],
+            rateLimited: res?.rateLimited || false
+          });
+        })
+        .catch(() => {
+          // FIX: Added rateLimited: false to safely reset the state on normal errors.
+          if (currentRequest === requestId.current) setData({ top: [], rising: [], rateLimited: false });
+        })
+        .finally(() => {
+          if (currentRequest === requestId.current) setLoading(false);
         });
-      })
-      .catch(() => {
-        // FIX: Added rateLimited: false to safely reset the state on normal errors.
-        if (currentRequest === requestId.current) setData({ top: [], rising: [], rateLimited: false });
-      })
-      .finally(() => {
-        if (currentRequest === requestId.current) setLoading(false);
-      });
+    }, 350);
+
+    return () => clearTimeout(timer);
   }, [keyword, country, range, retryTick]);
 
   const handleRetry = () => setRetryTick((t) => t + 1);

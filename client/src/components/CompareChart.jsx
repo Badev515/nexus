@@ -14,28 +14,32 @@ export default function CompareChart({ keywords, geo, range }) {
     let cancelled = false;
     setLoading(true);
 
-    Promise.allSettled(keywords.map((kw) => getTrend(kw, geo, range))).then((results) => {
-      if (cancelled) return;
+    // Range/country badalne par debounce - taake rapid changes har baar
+    // compare ke sab keywords ke liye alag Trends burst na banayen.
+    const timer = setTimeout(() => {
+      Promise.allSettled(keywords.map((kw) => getTrend(kw, geo, range))).then((results) => {
+        if (cancelled) return;
 
-      const series = results.map((res) =>
-        res.status === 'fulfilled' ? res.value?.default?.timelineData || [] : []
-      );
+        const series = results.map((res) =>
+          res.status === 'fulfilled' ? res.value?.default?.timelineData || [] : []
+        );
 
-      const maxLen = Math.max(...series.map((s) => s.length), 0);
-      const merged = [];
-      for (let i = 0; i < maxLen; i++) {
-        const point = { date: series[0]?.[i]?.formattedTime || '' };
-        keywords.forEach((kw, idx) => {
-          point[kw] = series[idx]?.[i]?.value?.[0] ?? null;
-        });
-        merged.push(point);
-      }
+        const maxLen = Math.max(...series.map((s) => s.length), 0);
+        const merged = [];
+        for (let i = 0; i < maxLen; i++) {
+          const point = { date: series[0]?.[i]?.formattedTime || '' };
+          keywords.forEach((kw, idx) => {
+            point[kw] = series[idx]?.[i]?.value?.[0] ?? null;
+          });
+          merged.push(point);
+        }
 
-      setChartData(merged);
-      setLoading(false);
-    });
+        setChartData(merged);
+        setLoading(false);
+      });
+    }, 350);
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [keywords.join('|'), geo, range]);
 
   if (keywords.length < 2) return null;
